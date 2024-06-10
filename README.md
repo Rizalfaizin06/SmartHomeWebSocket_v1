@@ -1,0 +1,1 @@
+# SmartHomeWebSocket_v1
