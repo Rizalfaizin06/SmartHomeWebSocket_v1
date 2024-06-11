@@ -34,11 +34,11 @@ void connectToServer() {
   bool connected = client.connect(websockets_server_host, websockets_server_port, "/");
   // bool connected = client.connect("ws://home.rizalscompanylab.my.id/");
 
-  for (int i = 0; i < 10 && !client.available() || !client.ping(); i++) {
-    Serial.print(".");
-    delay(250);
-  }
-  Serial.println(".");
+  // for (int i = 0; i < 10 && !client.available() || !client.ping(); i++) {
+  //   Serial.print(".");
+  //   delay(250);
+  // }
+  // Serial.println(".");
   if (connected) {
     Serial.println("Connected to server!");
     // client.send("Hello Server");
@@ -70,9 +70,9 @@ void setup() {
     } else if (message.data() == "lamp1-off") {
       digitalWrite(lamp1, HIGH);
       Serial.println("Turning OFF Lamp 1");
-    } else if (message.data() == "lamp2-off") {
-      digitalWrite(lamp2, HIGH);
-      Serial.println("Turning OFF Lamp 2");
+    } else if (message.data() == "lamp2-on") {
+      digitalWrite(lamp2, LOW);
+      Serial.println("Turning ON Lamp 2");
     } else if (message.data() == "lamp2-off") {
       digitalWrite(lamp2, HIGH);
       Serial.println("Turning OFF Lamp 2");
@@ -84,6 +84,8 @@ void setup() {
 
 void loop() {
   if (WiFi.status() == WL_CONNECTED) {
+    
+      Serial.println("Check Server");
     if (!client.available() || !client.ping()) {
       Serial.println("Disconnected from server. Reconnecting...");
       connectToServer();
