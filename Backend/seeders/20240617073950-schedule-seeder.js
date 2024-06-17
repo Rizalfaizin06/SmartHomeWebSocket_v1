@@ -17,15 +17,15 @@ module.exports = {
             [
                 {
                     device_id: 1,
-                    hour: 0,
+                    hour: 6,
                     minute: 0,
                     second: 0,
                     status: true,
                 },
                 {
                     device_id: 1,
-                    hour: 0,
-                    minute: 0,
+                    hour: 23,
+                    minute: 25,
                     second: 10,
                     status: true,
                 },

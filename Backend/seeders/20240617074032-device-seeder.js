@@ -16,12 +16,20 @@ module.exports = {
             "devices",
             [
                 {
-                    name: "Lamp1",
+                    name: "Lampu 1",
+                    status: false,
+                },
+                {
+                    name: "Lampu 2",
+                    status: false,
+                },
+                {
+                    name: "Lampu 3",
                     status: true,
                 },
                 {
-                    name: "Lamp2",
-                    status: true,
+                    name: "Lampu 4",
+                    status: false,
                 },
             ],
             {}
