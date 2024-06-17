@@ -4,7 +4,6 @@ const http = require("http");
 const WebSocket = require("ws");
 const app = express();
 const { Device, Schedule } = require("./models");
-const { time } = require("console");
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
@@ -61,6 +60,8 @@ app.post("/schedule", async (req, res) => {
     const deviceName = scheduleWithDevice.device.name;
     const deviceId = scheduleWithDevice.device.id;
     const rule = new schedule.RecurrenceRule();
+    rule.hour = hour;
+    rule.minute = minute;
     rule.second = second;
 
     const job = schedule.scheduleJob(rule, () => {
@@ -147,8 +148,8 @@ async function refreshSchedule() {
         //     new schedule.Range(3, 3), // Wednesday
         //     new schedule.Range(5, 5),
         // ]; // Friday
-        // rule.hour = data.hour;
-        // rule.minute = data.minute;
+        rule.hour = data.hour;
+        rule.minute = data.minute;
         rule.second = data.second;
 
         const job = schedule.scheduleJob(rule, () => {
@@ -175,6 +176,9 @@ async function refreshSchedule() {
 
     // Send JSON response with all schedules
     // res.json(filteredSchedules);
+    if (!filteredSchedules) {
+        return;
+    }
     console.log("Turning on " + filteredSchedules.length + " Scheduled jobs:");
     console.log(filteredSchedules);
 }
@@ -191,8 +195,8 @@ async function cancelAllJobs() {
 async function findSchedules() {
     if (Object.keys(scheduledJobs).length === 0) {
         // return res.json([]); // Handle empty scheduledJobs (e.g., send an empty response)
-        console.log("No Schedule Jobs Initialized");
-        return;
+        console.log("No Schedule Jobs");
+        return "No Schedule Jobs";
     }
 
     // Process scheduled jobs
@@ -207,6 +211,8 @@ async function findSchedules() {
                 device: job.device,
                 status: job.status,
                 second: job.second,
+                minute: job.minute,
+                hour: job.hour,
                 nextRun: time.toISOString().slice(2, 19).replace("T", " "),
             };
 
@@ -256,7 +262,7 @@ wss.on("connection", async function connection(ws) {
         const time = Date.now();
         broadcastStatus(device.id, device.name, device.status, time);
     }
-    console.log("State Devices");
+    console.log("State Devices : ");
     console.log(devices);
     ws.id_client = Math.random().toString(36).substr(2, 9);
 
@@ -271,8 +277,8 @@ wss.on("connection", async function connection(ws) {
     });
 });
 
-server.listen(8080, () => {
-    console.log("Server is listening on port 8080");
+server.listen(port, () => {
+    console.log(`Server is listening on port ${port}`);
 });
 
 refreshSchedule();
