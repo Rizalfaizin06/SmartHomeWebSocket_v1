@@ -1,32 +1,18 @@
 const express = require("express");
 const schedule = require("node-schedule");
-const http = require("http");
-const WebSocket = require("ws");
 const app = express();
 const { Device, Schedule } = require("./models");
-const { time } = require("console");
-const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const port = 8080;
+const port = 3000;
 let scheduledJobs = {};
-let devices = {};
-// ---------- Device State ----------
-app.post("/device", async (req, res) => {
-    const deviceId = req.body.deviceId;
-    const status = req.body.status;
-    const time = new Date().toTimeString().split(" ")[0];
-    const device = await Device.findByPk(deviceId);
 
-    broadcastStatus(deviceId, device.name, status, time);
-    res.json({ message: "Device state updated successfully.", data: device });
-});
-// ---------- Device State ----------
-
-// ---------- Schedule ----------
+function broadcastStatus(deviceId, deviceName, status, time) {
+    console.log(`Update Status Device ID : ${deviceId} to ${status}`);
+    console.log(`Broadcast: Device ${deviceName} is ${status} at ${time}`);
+}
 
 // Endpoint untuk membuat jadwal baru
 app.post("/schedule", async (req, res) => {
@@ -116,8 +102,6 @@ app.get("/schedules", async (req, res) => {
     // Send JSON response with all schedules
     res.json(filteredSchedules);
 });
-
-// ---------- Schedule ----------
 
 async function refreshSchedule() {
     await cancelAllJobs();
@@ -226,53 +210,8 @@ async function findSchedules() {
     return filteredSchedules;
 }
 
-function broadcastStatus(deviceId, deviceName, status, time) {
-    console.log(`Update Status Device ID : ${deviceId} to ${status}`);
-    console.log(`Broadcast: Device ${deviceName} is ${status} at ${time}`);
-    const message = `device${deviceId}-${status === true ? "on" : "off"}`;
-    console.log(message);
-    wss.clients.forEach((client) => {
-        if (client.readyState === WebSocket.OPEN) {
-            client.send(message);
-        }
-    });
-
-    Device.update({ status: status }, { where: { id: deviceId } });
-}
-
-// app.listen(port, () => {
-//     console.log(`Server is running on port ${port}`);
-// });
-
-wss.on("connection", async function connection(ws) {
-    // console.log("Client connected | " + lamp1 + " | " + lamp2);
-    // ws.send(lamp1);
-    // ws.send(lamp2);
-    const Devices = await Device.findAll();
-    for (const device of Devices) {
-        devices[device.id] = {
-            status: device.status,
-        };
-        const time = Date.now();
-        broadcastStatus(device.id, device.name, device.status, time);
-    }
-    console.log("State Devices");
-    console.log(devices);
-    ws.id_client = Math.random().toString(36).substr(2, 9);
-
-    console.log(`Client connected with ID: ${ws.id_client}`);
-
-    ws.on("message", async function (message) {
-        console.log(`Received message from ${ws.id_client}: ${message}`);
-    });
-
-    ws.on("close", async function () {
-        console.log(`Client disconnected with ID: ${ws.id_client}`);
-    });
-});
-
-server.listen(8080, () => {
-    console.log("Server is listening on port 8080");
+app.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
 });
 
 refreshSchedule();
