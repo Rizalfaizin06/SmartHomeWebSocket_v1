@@ -42,17 +42,6 @@ app.post("/schedule/:lamp/:status/:second", (req, res) => {
     res.json({ jobId, lamp, status, second });
 });
 
-// Endpoint untuk mendapatkan semua jadwal
-// app.get("/schedules", (req, res) => {
-//     const allSchedules = Object.keys(scheduledJobs).map((jobId) => ({
-//         jobId,
-//         ...scheduledJobs[jobId],
-//     }));
-//     res.json(allSchedules);
-// });
-// Endpoint untuk mendapatkan semua jadwal
-// Endpoint to get all schedules
-// Endpoint to get all schedules
 app.get("/schedules", (req, res) => {
     // Check if there are any scheduled jobs
     if (Object.keys(scheduledJobs).length === 0) {
@@ -92,15 +81,6 @@ app.get("/schedules", (req, res) => {
     res.json(filteredSchedules);
 });
 
-// Endpoint untuk mendapatkan jadwal berdasarkan ID
-// app.get("/schedule/:jobId", (req, res) => {
-//     const jobId = req.params.jobId;
-//     const job = scheduledJobs[jobId];
-//     if (!job) {
-//         return res.status(404).send("Job not found");
-//     }
-//     res.json({ jobId, ...job });
-// });
 app.get("/schedule/:jobId", (req, res) => {
     const jobId = req.params.jobId;
     const job = scheduledJobs[jobId];
