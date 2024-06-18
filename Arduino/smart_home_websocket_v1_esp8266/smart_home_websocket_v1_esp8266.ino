@@ -9,9 +9,10 @@ const char* ssid = "Dream BIG";
 // const char* ssid = "Treacherous";
 const char* password = "dreambig";
 // const char* password = "12344321";
-const char* websockets_server_host = "192.168.10.95";
+// const char* websockets_server_host = "home.rizalscompanylab.my.id";
+// const char* websockets_server_host = "192.168.10.95";
 // const char* websockets_server_host = "192.168.100.123";
-const uint16_t websockets_server_port = 8080;
+// const uint16_t websockets_server_port = 8080;
 
 using namespace websockets;
 
@@ -36,8 +37,8 @@ void connectToWifi() {
 
 void connectToServer() {
   Serial.print("Connecting to server.");
-  bool connected = client.connect(websockets_server_host, websockets_server_port, "/");
-  // bool connected = client.connect("ws://home.rizalscompanylab.my.id/");
+  // bool connected = client.connect(websockets_server_host, websockets_server_port, "/");
+  bool connected = client.connect("ws://home.rizalscompanylab.my.id/");
 
   // for (int i = 0; i < 10 && !client.available() || !client.ping(); i++) {
   //   Serial.print(".");
