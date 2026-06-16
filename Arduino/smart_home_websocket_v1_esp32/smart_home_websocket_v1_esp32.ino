@@ -1,11 +1,16 @@
 #include <ArduinoWebsockets.h>
 #include <WiFi.h>
 
-const int lamp1 = 18;
-const int lamp2 = 19;
-const char* ssid = "Treacherous";
+const int device4 = 5;
+const int device3 = 4;
+const int device2 = 14;
+const int device1 = 12;
+const char* ssid = "Redmi Note 4x";
+// const char* ssid = "Treacherous";
 const char* password = "12344321";
-const char* websockets_server_host = "192.168.100.123";
+// const char* websockets_server_host = "home.rizalscompanylab.my.id";
+// const char* websockets_server_host = "192.168.10.95";
+const char* websockets_server_host = "10.10.10.102";
 const uint16_t websockets_server_port = 8080;
 
 using namespace websockets;
@@ -50,10 +55,14 @@ void connectToServer() {
 void setup() {
   Serial.begin(115200);
 
-  pinMode(lamp1, OUTPUT);
-  pinMode(lamp2, OUTPUT);
-  digitalWrite(lamp1, HIGH);
-  digitalWrite(lamp2, HIGH);
+  pinMode(device1, OUTPUT);
+  pinMode(device2, OUTPUT);
+  pinMode(device3, OUTPUT);
+  pinMode(device4, OUTPUT);
+  digitalWrite(device1, LOW);
+  digitalWrite(device2, LOW);
+  digitalWrite(device3, LOW);
+  digitalWrite(device4, LOW);
 
   connectToWifi();
   if (WiFi.status() == WL_CONNECTED) {
@@ -64,18 +73,30 @@ void setup() {
     Serial.print("Got Message: ");
     Serial.println(message.data());
 
-    if (message.data() == "lamp1-on") {
-      digitalWrite(lamp1, LOW);
-      Serial.println("Turning ON Lamp 1");
-    } else if (message.data() == "lamp1-off") {
-      digitalWrite(lamp1, HIGH);
-      Serial.println("Turning OFF Lamp 1");
-    } else if (message.data() == "lamp2-on") {
-      digitalWrite(lamp2, LOW);
-      Serial.println("Turning ON Lamp 2");
-    } else if (message.data() == "lamp2-off") {
-      digitalWrite(lamp2, HIGH);
-      Serial.println("Turning OFF Lamp 2");
+    if (message.data() == "device1-on") {
+      digitalWrite(device1, HIGH);
+      Serial.println("Turning ON Device 1");
+    } else if (message.data() == "device1-off") {
+      digitalWrite(device1, LOW);
+      Serial.println("Turning OFF Device 1");
+    } else if (message.data() == "device2-on") {
+      digitalWrite(device2, HIGH);
+      Serial.println("Turning ON Device 2");
+    } else if (message.data() == "device2-off") {
+      digitalWrite(device2, LOW);
+      Serial.println("Turning OFF Device 2");
+    } else if (message.data() == "device3-on") {
+      digitalWrite(device3, HIGH);
+      Serial.println("Turning ON Device 3");
+    } else if (message.data() == "device3-off") {
+      digitalWrite(device3, LOW);
+      Serial.println("Turning OFF Device 3");
+    } else if (message.data() == "device4-on") {
+      digitalWrite(device4, HIGH);
+      Serial.println("Turning ON Device 4");
+    } else if (message.data() == "device4-off") {
+      digitalWrite(device4, LOW);
+      Serial.println("Turning OFF Device 4");
     } else {
       Serial.println("Doing Nothing");
     }

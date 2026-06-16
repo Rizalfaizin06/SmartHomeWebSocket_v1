@@ -1,157 +1,158 @@
+require("dotenv").config();
+
 const express = require("express");
-const schedule = require("node-schedule");
+const cors = require("cors");
+const http = require("http");
+const WebSocket = require("ws");
+const swaggerUi = require("swagger-ui-express");
+const swaggerDocument = require("./swagger.json");
+
+const { Device } = require("./models");
+const { refreshSchedules } = require("./controllers/scheduleController");
+
+const authRoutes = require("./routes/auth");
+const deviceRoutes = require("./routes/device");
+const scheduleRoutes = require("./routes/schedule");
+
 const app = express();
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
 
-const port = 3000;
-let jobIdCounter = 1;
-// Objek untuk menyimpan jadwal dengan ID
-const scheduledJobs = {};
+const port = process.env.PORT || 8080;
 
-app.use(express.json()); // Untuk memproses JSON dalam request
+// ========== User-to-WebSocket Connections Mapping ==========
+// { userId: Set<ws> }
+const userConnections = {};
 
-// Fungsi broadcastStatus
-function broadcastStatus(lamp, status, time) {
-    console.log(`Broadcast: Lamp ${lamp} is ${status} at ${time}`);
+// ========== Middleware ==========
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Swagger
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+
+// ========== Broadcast to User's ESP32s Only ==========
+// Kirim command hanya ke ESP32 yang sudah register dengan userId tertentu
+function broadcastStatus(userId, deviceId, deviceName, slot, status, time) {
+    console.log(`[WS] User ${userId} | ${deviceName} (slot: ${slot}) -> ${status ? "ON" : "OFF"} at ${time}`);
+
+    const payload = JSON.stringify({
+        type: "command",
+        slot,
+        status: status === true ? "true" : "false",
+    });
+
+    // Hanya kirim ke client yang terdaftar untuk userId ini
+    const clients = userConnections[userId];
+    if (clients) {
+        clients.forEach((client) => {
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(payload);
+            }
+        });
+    }
+
+    Device.update({ status }, { where: { id: deviceId } });
 }
 
-// Endpoint untuk membuat jadwal baru
-app.post("/schedule/:lamp/:status/:second", (req, res) => {
-    const second = parseInt(req.params.second);
-    const lamp = req.params.lamp;
-    const status = req.params.status;
+// ========== Routes ==========
+app.use("/auth", authRoutes);
+app.use("/devices", deviceRoutes(broadcastStatus));
+app.use("/schedules", scheduleRoutes(broadcastStatus));
 
-    // Validasi input
-    if (isNaN(second) || second < 0 || second > 59) {
-        return res
-            .status(400)
-            .send("Invalid second parameter. It must be between 0 and 59.");
-    }
+// ========== WebSocket Connection Handler ==========
+wss.on("connection", function connection(ws) {
+    ws.id_client = Math.random().toString(36).substring(2, 11);
+    ws.userId = null; // Belum ter-register
+    console.log(`[WS] Client connected: ${ws.id_client}`);
 
-    const rule = new schedule.RecurrenceRule();
-    rule.second = second;
+    ws.on("message", async (raw) => {
+        let message;
+        try {
+            message = JSON.parse(raw.toString());
+        } catch (e) {
+            ws.send(JSON.stringify({ type: "error", message: "Invalid JSON format." }));
+            return;
+        }
 
-    const job = schedule.scheduleJob(rule, () => {
-        const now = new Date();
-        const time = now.toTimeString().split(" ")[0];
-        broadcastStatus(lamp, status, time);
+        // Handle register message dari ESP32
+        if (message.type === "register") {
+            const userId = message.userId;
+
+            if (!userId) {
+                ws.send(JSON.stringify({ type: "error", message: "userId is required." }));
+                return;
+            }
+
+            // Simpan mapping
+            ws.userId = userId;
+            if (!userConnections[userId]) {
+                userConnections[userId] = new Set();
+            }
+            userConnections[userId].add(ws);
+
+            console.log(`[WS] Client ${ws.id_client} registered as User ${userId}`);
+
+            // Kirim sync: state semua device milik user ini
+            const devices = await Device.findAll({ where: { user_id: userId } });
+            const syncPayload = JSON.stringify({
+                type: "sync",
+                devices: devices.map((d) => ({
+                    slot: d.slot,
+                    status: d.status === true ? "true" : "false",
+                })),
+            });
+            ws.send(syncPayload);
+
+            console.log(`[WS] Sent sync (${devices.length} devices) to Client ${ws.id_client}`);
+            return;
+        }
+
+        // Pesan lain bisa ditambahkan di sini (misal heartbeat/pong)
+        console.log(`[WS] Message from ${ws.id_client}: ${raw}`);
     });
 
-    const jobId = jobIdCounter++; // Generate ID unik
-    scheduledJobs[jobId] = { job, lamp, status, second };
+    ws.on("close", () => {
+        console.log(`[WS] Client disconnected: ${ws.id_client}`);
 
-    res.json({ jobId, lamp, status, second });
-});
-
-app.get("/schedules", (req, res) => {
-    // Check if there are any scheduled jobs
-    if (Object.keys(scheduledJobs).length === 0) {
-        return res.json([]); // Handle empty scheduledJobs (e.g., send an empty response)
-    }
-
-    // Process scheduled jobs
-    const allSchedules = Object.keys(scheduledJobs).map((jobId) => {
-        const job = scheduledJobs[jobId];
-
-        // Check if the job is defined and valid
-        if (job) {
-            // Extract relevant job information
-            const time = new Date(job.job.nextInvocation().toISOString());
-            const safeJob = {
-                jobId,
-                lamp: job.lamp,
-                status: job.status,
-                nextRun: time.toTimeString().split(" ")[0], // Convert to HH:MM:SS format
-                second: job.second,
-            };
-
-            return safeJob;
-        } else {
-            // If the job object is invalid or undefined, skip it
-            console.error(`Job with ID '${jobId}' is undefined or invalid.`);
-            return null; // Return null to filter out this invalid job
+        // Hapus dari mapping
+        if (ws.userId && userConnections[ws.userId]) {
+            userConnections[ws.userId].delete(ws);
+            if (userConnections[ws.userId].size === 0) {
+                delete userConnections[ws.userId];
+            }
         }
     });
-
-    // Filter out skipped jobs (null values)
-    const filteredSchedules = allSchedules.filter(
-        (schedule) => schedule !== null
-    );
-
-    // Send JSON response with all schedules
-    res.json(filteredSchedules);
 });
 
-app.get("/schedule/:jobId", (req, res) => {
-    const jobId = req.params.jobId;
-    const job = scheduledJobs[jobId];
+// ========== Ping/Pong Heartbeat ==========
+// Deteksi ESP32 yang disconnect diam-diam
+const PING_INTERVAL = 30000; // 30 detik
 
-    // Check if job exists
-    if (!job) {
-        return res.status(404).send("Job not found");
-    }
-
-    // Extract relevant details, sanitizing JSON response to avoid circular structure issues
-    const jobDetails = {
-        jobId,
-        lamp: job.lamp,
-        status: job.status,
-        second: job.second,
-    };
-
-    // Respond with job details in JSON format
-    res.json(jobDetails);
-});
-
-// Endpoint untuk menghapus jadwal berdasarkan ID
-app.delete("/schedule/:jobId", (req, res) => {
-    const jobId = req.params.jobId;
-    const job = scheduledJobs[jobId];
-    if (!job) {
-        return res.status(404).send("Job not found");
-    }
-    job.job.cancel(); // Membatalkan pekerjaan di jadwal
-    delete scheduledJobs[jobId];
-    res.send("Job deleted");
-});
-
-// Endpoint untuk memperbarui jadwal berdasarkan ID
-app.put("/schedule/:jobId/:lamp/:status/:second", (req, res) => {
-    const jobId = req.params.jobId;
-    const second = parseInt(req.params.second);
-    const lamp = req.params.lamp;
-    const status = req.params.status;
-
-    // Validasi input
-    if (isNaN(second) || second < 0 || second > 59) {
-        return res
-            .status(400)
-            .send("Invalid second parameter. It must be between 0 and 59.");
-    }
-
-    const existingJob = scheduledJobs[jobId];
-    if (!existingJob) {
-        return res.status(404).send("Job not found");
-    }
-
-    // Batalkan jadwal yang sudah ada
-    existingJob.job.cancel();
-
-    // Jadwalkan pekerjaan baru
-    const rule = new schedule.RecurrenceRule();
-    rule.second = second;
-
-    const job = schedule.scheduleJob(rule, () => {
-        const now = new Date();
-        const time = now.toTimeString().split(" ")[0];
-        broadcastStatus(lamp, status, time);
+setInterval(() => {
+    wss.clients.forEach((ws) => {
+        if (ws.isAlive === false) {
+            console.log(`[WS] Terminating dead client: ${ws.id_client}`);
+            return ws.terminate();
+        }
+        ws.isAlive = false;
+        ws.ping();
     });
+}, PING_INTERVAL);
 
-    // Update jadwal dengan ID baru
-    scheduledJobs[jobId] = { job, lamp, status, second };
-
-    res.json({ jobId, lamp, status, second });
+wss.on("connection", (ws) => {
+    ws.isAlive = true;
+    ws.on("pong", () => {
+        ws.isAlive = true;
+    });
 });
 
-app.listen(port, () => {
+// ========== Start Server ==========
+server.listen(port, () => {
     console.log(`Server is running on port ${port}`);
+    console.log(`Swagger docs: http://localhost:${port}/api-docs`);
 });
+
+// Load scheduled jobs
+refreshSchedules(broadcastStatus);
