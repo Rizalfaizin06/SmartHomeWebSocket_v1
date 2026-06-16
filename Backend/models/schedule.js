@@ -1,17 +1,16 @@
 "use strict";
 const { Model } = require("sequelize");
+
 module.exports = (sequelize, DataTypes) => {
     class Schedule extends Model {
-        /**
-         * Helper method for defining associations.
-         * This method is not a part of Sequelize lifecycle.
-         * The `models/index` file will call this method automatically.
-         */
         static associate(models) {
-            // define association here
             Schedule.belongsTo(models.Device, {
                 foreignKey: "device_id",
                 as: "device",
+            });
+            Schedule.belongsTo(models.User, {
+                foreignKey: "user_id",
+                as: "user",
             });
         }
     }
@@ -22,6 +21,10 @@ module.exports = (sequelize, DataTypes) => {
                 autoIncrement: true,
                 primaryKey: true,
                 type: DataTypes.INTEGER,
+            },
+            user_id: {
+                type: DataTypes.INTEGER,
+                allowNull: false,
             },
             device_id: DataTypes.INTEGER,
             hour: DataTypes.INTEGER,

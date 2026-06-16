@@ -2,19 +2,19 @@
 const { Model } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
-    class Device extends Model {
+    class User extends Model {
         static associate(models) {
-            Device.belongsTo(models.User, {
+            User.hasMany(models.Device, {
                 foreignKey: "user_id",
-                as: "user",
+                as: "devices",
             });
-            Device.hasMany(models.Schedule, {
-                foreignKey: "device_id",
+            User.hasMany(models.Schedule, {
+                foreignKey: "user_id",
                 as: "schedules",
             });
         }
     }
-    Device.init(
+    User.init(
         {
             id: {
                 allowNull: false,
@@ -22,22 +22,24 @@ module.exports = (sequelize, DataTypes) => {
                 primaryKey: true,
                 type: DataTypes.INTEGER,
             },
-            user_id: {
-                type: DataTypes.INTEGER,
+            name: {
+                type: DataTypes.STRING,
                 allowNull: false,
             },
-            name: DataTypes.STRING,
-            slot: {
-                type: DataTypes.INTEGER,
+            email: {
+                type: DataTypes.STRING,
                 allowNull: false,
-                comment: "Slot number on ESP32 (e.g. relay pin index)",
+                unique: true,
             },
-            status: DataTypes.BOOLEAN,
+            password: {
+                type: DataTypes.STRING,
+                allowNull: false,
+            },
         },
         {
             sequelize,
-            modelName: "Device",
+            modelName: "User",
         }
     );
-    return Device;
+    return User;
 };
